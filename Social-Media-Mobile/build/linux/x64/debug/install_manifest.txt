@@ -1,0 +1,13 @@
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/demo
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/icudtl.dat
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/lib/libflutter_linux_gtk.so
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/FontManifest.json
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/NativeAssetsManifest.json
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/version.json
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/shaders/ink_sparkle.frag
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/kernel_blob.bin
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/NOTICES.Z
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/AssetManifest.bin
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/fonts/MaterialIcons-Regular.otf
+/home/tiendungv03/lm vs/demo/flutter/Social-Media-Mobile/build/linux/x64/debug/bundle/data/flutter_assets/AssetManifest.json
