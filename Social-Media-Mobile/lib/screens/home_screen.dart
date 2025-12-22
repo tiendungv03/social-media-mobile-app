@@ -8,7 +8,11 @@ import '../widgets/profile_tab.dart';
 import 'create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  // 👇 1. Khai báo biến nhận ID người dùng
+  final String currentUserId;
+
+  // 👇 2. Yêu cầu bắt buộc phải truyền ID khi gọi HomeScreen
+  const HomeScreen({super.key, required this.currentUserId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -54,9 +58,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody() {
     switch (_currentIndex) {
       case 1:
-        return const FriendsTab();
+      // 👇 3. SỬA QUAN TRỌNG: Dùng ID động (widget.currentUserId) thay vì ID cứng
+        return FriendsTab(currentUserId: widget.currentUserId);
       case 2:
-        return const ProfileTab();
+        return ProfileTab(currentUserId: widget.currentUserId);
       default:
         return PostList(
           future: _future,

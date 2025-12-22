@@ -1,5 +1,8 @@
+// lib/screens/login_screen.dart
+
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../main.dart'; // Để dùng authService toàn cục
+import 'home_screen.dart'; // Import để chuyển sang màn hình Home
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -19,16 +22,48 @@ class _LoginScreenState extends State<LoginScreen> {
       _loading = true;
       _error = null;
     });
+
     try {
-      await authService.login(
+      // 👇 1. Gọi API Login
+      final data = await authService.login(
         _usernameCtl.text.trim(),
         _passwordCtl.text.trim(),
       );
+
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/home');
+
+      // 👇 2. IN LOG RA CONSOLE ĐỂ DEBUG (Quan trọng)
+      print("🔍 DATA TẠI LOGIN SCREEN: $data");
+
+      // 👇 3. LẤY ID AN TOÀN (Tránh lỗi Null)
+      // Ép kiểu data['user'] thành Map để truy cập an toàn
+      final userObj = data['user'] is Map ? data['user'] as Map<String, dynamic> : null;
+
+      // Tìm ID ở mọi ngóc ngách có thể (user._id, user.id, data._id, data.id)
+      String? userId = userObj?['_id'] ?? userObj?['id'] ?? data['_id'] ?? data['id'];
+
+      // 👇 4. KIỂM TRA LẠI LẦN CUỐI
+      if (userId == null) {
+        throw Exception("Lỗi: Không tìm thấy ID người dùng.\nDữ liệu server trả về: $data");
+      }
+
+      print("✅ Đã tìm thấy User ID: $userId");
+
+      // 👇 5. CHUYỂN TRANG
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(currentUserId: userId!),
+        ),
+      );
+
     } catch (e) {
+      print("❌ Lỗi đăng nhập: $e");
       setState(() {
-        _error = e.toString();
+        // Hiển thị lỗi ngắn gọn cho người dùng đỡ sợ
+        _error = e.toString().contains("Exception:")
+            ? e.toString().replaceAll("Exception: ", "")
+            : "Đăng nhập thất bại. Vui lòng thử lại.";
       });
     } finally {
       if (mounted) {
@@ -39,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // --- PHẦN GIAO DIỆN (UI) GIỮ NGUYÊN NHƯ CŨ ---
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
@@ -101,6 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 if (_error != null)
                   Text(
                     _error!,
+                    textAlign: TextAlign.center,
                     style: const TextStyle(
                         color: Colors.redAccent, fontSize: 13),
                   ),
@@ -178,7 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-
+                // (Giữ nguyên phần còn lại của UI như nút Google, Sign up...)
                 const SizedBox(height: 12),
                 TextButton.icon(
                   onPressed: () {
@@ -235,7 +272,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 8),
               ],
             ),
