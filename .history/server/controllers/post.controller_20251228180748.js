@@ -11,8 +11,7 @@ export const createPost = async (req, res) => {
       imageUrl,
       tags: tags || [],
     });
-    // 👇 Sửa: Lấy thêm 'name'
-    const populated = await post.populate("owner", "username name avatarUrl");
+    const populated = await post.populate("owner", "username avatarUrl");
     return res.status(201).json(populated);
   } catch (e) {
     console.error("CREATE_POST_ERROR:", e);
@@ -25,8 +24,7 @@ export const getFeed = async (req, res) => {
   try {
     const posts = await Post.find({ isPublic: true })
       .sort({ createdAt: -1 })
-      // 👇 Sửa: Lấy thêm 'name'
-      .populate("owner", "username name avatarUrl");
+      .populate("owner", "username avatarUrl");
     res.json(posts);
   } catch (e) {
     res.status(500).json({ message: "Get feed error" });
@@ -39,8 +37,7 @@ export const getUserPosts = async (req, res) => {
     const { userId } = req.params;
     const posts = await Post.find({ owner: userId })
       .sort({ createdAt: -1 })
-      // 👇 Sửa: Lấy thêm 'name'
-      .populate("owner", "username name avatarUrl");
+      .populate("owner", "username avatarUrl");
     res.json(posts);
   } catch (e) {
     res.status(500).json({ message: "Get user posts error" });
@@ -83,33 +80,26 @@ export const deletePost = async (req, res) => {
   }
 };
 
-// --- 👇 2 HÀM QUAN TRỌNG ĐỂ HIỂN THỊ TÊN ĐÚNG ---
+// --- 👇 2 HÀM MỚI QUAN TRỌNG ĐỂ SỬA LỖI 404 (VIẾT CHO KHỚP SCHEMA MỚI) ---
 
-// 6. LẤY CHI TIẾT BÀI VIẾT (Kèm Comments)
+// 6. LẤY CHI TIẾT BÀI VIẾT (Kèm Comments từ bảng Comment)
 export const getPost = async (req, res) => {
   try {
+    // Lưu ý: Route dùng :postId nên ở đây lấy postId
     const { postId } = req.params; 
 
-    // Tìm bài viết - Lấy cả 'name'
-    const post = await Post.findById(postId).populate("owner", "username name avatarUrl");
+    // Tìm bài viết
+    const post = await Post.findById(postId).populate("owner", "username avatarUrl");
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Tìm comment - Lấy cả 'name' của người comment
+    // Tìm comment thuộc về bài viết này (Sắp xếp cũ nhất trước)
     const comments = await Comment.find({ post: postId })
-        // 👇 QUAN TRỌNG: Thêm 'name' vào chuỗi populate
-        .populate("user", "username name avatarUrl") 
+        .populate("owner", "username avatarUrl")
         .sort({ createdAt: 1 });
 
-    // Map dữ liệu
-    const formattedComments = comments.map(c => ({
-        _id: c._id,
-        content: c.text,
-        createdAt: c.createdAt,
-        owner: c.user // Bây giờ owner đã có cả 'username' và 'name'
-    }));
-
+    // Gộp comment vào bài viết để trả về cho Flutter
     const result = post.toObject();
-    result.comments = formattedComments;
+    result.comments = comments; // Flutter sẽ đọc field này
 
     res.json(result);
   } catch (e) {
@@ -118,29 +108,29 @@ export const getPost = async (req, res) => {
   }
 };
 
-// 7. BÌNH LUẬN (Trả về tên ngay lập tức)
+// 7. BÌNH LUẬN (Đã sửa lại tên trường cho khớp với Database)
 export const commentPost = async (req, res) => {
   try {
     const { postId } = req.params;
-    const { content } = req.body;
+    const { content } = req.body; // Flutter gửi lên là 'content'
 
-    if (!req.user) return res.status(401).json({ message: "No user found" });
-    if (!content) return res.status(400).json({ message: "Content required" });
-
+    // 👇 KHÚC QUAN TRỌNG NHẤT: ĐỔI TÊN CHO KHỚP DB
     const newComment = await Comment.create({
-      text: content,
+      text: content,      // ✅ Database đòi 'text', mình gán 'content' vào đây
       post: postId,
-      user: req.user._id
+      user: req.user._id  // ✅ Database đòi 'user', mình gán ID user vào đây
     });
 
-    // 👇 QUAN TRỌNG: Thêm 'name' để hiển thị ngay
-    await newComment.populate("user", "username name avatarUrl");
+    // Populate để lấy thông tin người chat
+    await newComment.populate("user", "username avatarUrl");
 
+    // 👇 Trả về cho App (App lại đòi 'content' và 'owner' mới chịu hiển thị)
+    // Nên mình phải đổi tên ngược lại 1 lần nữa trước khi trả về
     const responseForApp = {
         _id: newComment._id,
-        content: newComment.text,
+        content: newComment.text, // Trả lại 'content' cho App vui
         createdAt: newComment.createdAt,
-        owner: newComment.user 
+        owner: newComment.user    // Trả lại 'owner' cho App vui
     };
 
     res.json(responseForApp);

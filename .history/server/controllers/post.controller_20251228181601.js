@@ -11,8 +11,7 @@ export const createPost = async (req, res) => {
       imageUrl,
       tags: tags || [],
     });
-    // 👇 Sửa: Lấy thêm 'name'
-    const populated = await post.populate("owner", "username name avatarUrl");
+    const populated = await post.populate("owner", "username avatarUrl");
     return res.status(201).json(populated);
   } catch (e) {
     console.error("CREATE_POST_ERROR:", e);
@@ -25,8 +24,7 @@ export const getFeed = async (req, res) => {
   try {
     const posts = await Post.find({ isPublic: true })
       .sort({ createdAt: -1 })
-      // 👇 Sửa: Lấy thêm 'name'
-      .populate("owner", "username name avatarUrl");
+      .populate("owner", "username avatarUrl");
     res.json(posts);
   } catch (e) {
     res.status(500).json({ message: "Get feed error" });
@@ -39,8 +37,7 @@ export const getUserPosts = async (req, res) => {
     const { userId } = req.params;
     const posts = await Post.find({ owner: userId })
       .sort({ createdAt: -1 })
-      // 👇 Sửa: Lấy thêm 'name'
-      .populate("owner", "username name avatarUrl");
+      .populate("owner", "username avatarUrl");
     res.json(posts);
   } catch (e) {
     res.status(500).json({ message: "Get user posts error" });
@@ -83,33 +80,33 @@ export const deletePost = async (req, res) => {
   }
 };
 
-// --- 👇 2 HÀM QUAN TRỌNG ĐỂ HIỂN THỊ TÊN ĐÚNG ---
+// --- 👇 2 HÀM QUAN TRỌNG ĐÃ SỬA LOGIC HIỂN THỊ ---
 
-// 6. LẤY CHI TIẾT BÀI VIẾT (Kèm Comments)
+// 6. LẤY CHI TIẾT BÀI VIẾT (Sửa để comment không bị mất khi reload)
 export const getPost = async (req, res) => {
   try {
     const { postId } = req.params; 
 
-    // Tìm bài viết - Lấy cả 'name'
-    const post = await Post.findById(postId).populate("owner", "username name avatarUrl");
+    // Tìm bài viết
+    const post = await Post.findById(postId).populate("owner", "username avatarUrl");
     if (!post) return res.status(404).json({ message: "Post not found" });
 
-    // Tìm comment - Lấy cả 'name' của người comment
+    // Tìm comment (Lấy User populate đầy đủ)
     const comments = await Comment.find({ post: postId })
-        // 👇 QUAN TRỌNG: Thêm 'name' vào chuỗi populate
-        .populate("user", "username name avatarUrl") 
-        .sort({ createdAt: 1 });
+        .populate("user", "username avatarUrl") // Lấy info người comment
+        .sort({ createdAt: 1 }); // Xếp theo thứ tự thời gian
 
-    // Map dữ liệu
+    // 👇 MAP DỮ LIỆU: Đổi tên trường cho App Flutter hiểu
+    // DB dùng 'text' & 'user' ---nhưng---> App cần 'content' & 'owner'
     const formattedComments = comments.map(c => ({
         _id: c._id,
-        content: c.text,
+        content: c.text, // ✅ Đổi text -> content
         createdAt: c.createdAt,
-        owner: c.user // Bây giờ owner đã có cả 'username' và 'name'
+        owner: c.user    // ✅ Đổi user -> owner
     }));
 
     const result = post.toObject();
-    result.comments = formattedComments;
+    result.comments = formattedComments; // Gán vào bài viết trả về
 
     res.json(result);
   } catch (e) {
@@ -118,7 +115,7 @@ export const getPost = async (req, res) => {
   }
 };
 
-// 7. BÌNH LUẬN (Trả về tên ngay lập tức)
+// 7. BÌNH LUẬN (Sửa để hiện tên ngay lập tức)
 export const commentPost = async (req, res) => {
   try {
     const { postId } = req.params;
@@ -127,20 +124,22 @@ export const commentPost = async (req, res) => {
     if (!req.user) return res.status(401).json({ message: "No user found" });
     if (!content) return res.status(400).json({ message: "Content required" });
 
+    // Tạo comment trong DB (Lưu đúng tên trường DB quy định)
     const newComment = await Comment.create({
-      text: content,
+      text: content,      // DB là 'text'
       post: postId,
-      user: req.user._id
+      user: req.user._id  // DB là 'user'
     });
 
-    // 👇 QUAN TRỌNG: Thêm 'name' để hiển thị ngay
-    await newComment.populate("user", "username name avatarUrl");
+    // Populate lấy info user ngay lập tức
+    await newComment.populate("user", "username avatarUrl");
 
+    // 👇 MAP DỮ LIỆU TRẢ VỀ: Đổi tên trường cho App Flutter hiểu ngay
     const responseForApp = {
         _id: newComment._id,
-        content: newComment.text,
+        content: newComment.text, // ✅ Trả về 'content'
         createdAt: newComment.createdAt,
-        owner: newComment.user 
+        owner: newComment.user    // ✅ Trả về 'owner' (chứa username, avatarUrl)
     };
 
     res.json(responseForApp);

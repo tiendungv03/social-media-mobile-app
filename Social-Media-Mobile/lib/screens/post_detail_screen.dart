@@ -237,10 +237,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
                               String username = "User";
                               String avatar = "";
+
                               if (c is Map) {
-                                if (c['user'] is Map) {
-                                  username = c['user']['username'] ?? "User";
-                                  avatar = c['user']['avatarUrl'] ?? "";
+                                // 👇 SỬA Ở ĐÂY: Ưu tiên lấy 'owner' (Code mới), nếu không có thì lấy 'user' (Code cũ)
+                                final userObj = c['owner'] ?? c['user'];
+
+                                if (userObj is Map) {
+                                  // Lấy username hoặc name tùy bạn
+                                  username = userObj['username'] ?? "User";
+                                  // Nếu muốn hiện tên thật (BUI DIEU) thì dùng dòng dưới này:
+                                  // username = userObj['name'] ?? userObj['username'] ?? "User";
+
+                                  avatar = userObj['avatarUrl'] ?? "";
                                 } else if (c['username'] != null) {
                                   username = c['username'];
                                 }
