@@ -1,17 +1,16 @@
 // lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
-import '../main.dart';
+import '../main.dart'; // Chứa biến toàn cục postService
 import '../models/post.dart';
-import '../widgets/post_list.dart';
+// import '../widgets/post_list.dart'; // ❌ Bỏ cái cũ này đi
 import '../widgets/friends_tab.dart';
 import '../widgets/profile_tab.dart';
+import '../widgets/post_item.dart'; // ✅ Import cái mới để hiển thị bài viết xịn hơn
 import 'create_post_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  // 👇 1. Khai báo biến nhận ID người dùng
   final String currentUserId;
 
-  // 👇 2. Yêu cầu bắt buộc phải truyền ID khi gọi HomeScreen
   const HomeScreen({super.key, required this.currentUserId});
 
   @override
@@ -28,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _future = postService.getFeed();
   }
 
+  // Hàm reload lại trang khi kéo xuống hoặc đăng bài xong
   Future<void> _reload() async {
     setState(() {
       _future = postService.getFeed();
@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => const CreatePostScreen()),
     );
+    // Nếu đăng bài thành công (trả về true) thì tải lại Feed
     if (created == true) {
       _reload();
     }
@@ -58,15 +59,48 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody() {
     switch (_currentIndex) {
       case 1:
-      // 👇 3. SỬA QUAN TRỌNG: Dùng ID động (widget.currentUserId) thay vì ID cứng
         return FriendsTab(currentUserId: widget.currentUserId);
       case 2:
         return ProfileTab(currentUserId: widget.currentUserId);
       default:
-        return PostList(
-          future: _future,
-          postService: postService,
-          onReload: _reload,
+      // 👇 THAY ĐỔI Ở ĐÂY: Dùng FutureBuilder + PostItem trực tiếp
+        return RefreshIndicator(
+          onRefresh: _reload, // Kéo xuống để refresh
+          child: FutureBuilder<List<PostModel>>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text("Lỗi: ${snapshot.error}"));
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Center(child: Text("Chưa có bài viết nào"));
+              }
+
+              final posts = snapshot.data!;
+
+              return ListView.builder(
+                itemCount: posts.length,
+                itemBuilder: (context, index) {
+                  final postModel = posts[index];
+
+                  // 👇 Gọi Widget PostItem (Code mới có nút Like/Comment)
+                  // Lưu ý: postModel.toJson() giúp chuyển đổi Model sang Map để PostItem đọc được
+                  return PostItem(
+                    post: postModel.toJson(),
+                    currentUserId: widget.currentUserId,
+
+                    // 👇 THÊM DÒNG NÀY: Khi bài viết bị xóa, tải lại Feed ngay
+                    onDeleted: () {
+                      _reload();
+                    },
+                  );
+                },
+              );
+            },
+          ),
         );
     }
   }
@@ -81,14 +115,19 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.white,
         title: Text(
           _appBarTitle(),
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w600,
+            // Nếu ở trang chủ thì dùng font chữ kiểu Instagram (nếu có), không thì để thường
+            fontFamily: _currentIndex == 0 ? 'Billabong' : null,
+            fontSize: _currentIndex == 0 ? 30 : 20,
           ),
         ),
         iconTheme: const IconThemeData(color: Colors.black),
       ),
       body: _buildBody(),
+
+      // Nút đăng bài (Chỉ hiện ở trang Home)
       floatingActionButton: _currentIndex == 0
           ? FloatingActionButton(
         onPressed: _openCreate,
@@ -96,11 +135,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: const Icon(Icons.add),
       )
           : null,
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         selectedItemColor: const Color(0xFF3797EF),
         unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
+        showUnselectedLabels: false, // Ẩn chữ cho giống Instagram
+        showSelectedLabels: false,
+        type: BottomNavigationBarType.fixed,
         onTap: (i) {
           setState(() {
             _currentIndex = i;
@@ -108,18 +150,18 @@ class _HomeScreenState extends State<HomeScreen> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
+            icon: Icon(Icons.home_outlined, size: 30),
+            activeIcon: Icon(Icons.home, size: 30),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
+            icon: Icon(Icons.group_outlined, size: 30),
+            activeIcon: Icon(Icons.group, size: 30),
             label: 'Friends',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+            icon: Icon(Icons.person_outline, size: 30),
+            activeIcon: Icon(Icons.person, size: 30),
             label: 'Profile',
           ),
         ],

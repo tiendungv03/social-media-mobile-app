@@ -135,6 +135,17 @@ export const likePost = async (req, res) => {
 
 // --- 👇 2 HÀM QUAN TRỌNG ĐỂ FIX LỖI 404 ---
 
+// 1. LẤY CHI TIẾT 1 BÀI VIẾT
+export const getPost = async (req, res) => { 
+    const { id } = req.params;
+    try {
+        const post = await PostMessage.findById(id);
+        if (!post) return res.status(404).json({ message: "Không tìm thấy bài viết" });
+        res.status(200).json(post);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
 
 // --- 👇 2 HÀM QUAN TRỌNG ĐỂ FIX LỖI 404 ---
 

@@ -35,41 +35,30 @@ class PostService {
     return (data['likes'] ?? 0) as int;
   }
 
-  // --- 👇 3 HÀM QUAN TRỌNG ĐÃ ĐƯỢC CẬP NHẬT ---
+  // --- 👇 2 HÀM MỚI THÊM VÀO ĐÂY ---
 
   // 1. Xóa bài viết
   Future<bool> deletePost(String postId) async {
     try {
-      await api.delete('/posts/$postId');
+      // Giả định ApiClient có hàm delete. Nếu chưa có, xem lưu ý bên dưới (*).
+      await api.delete('/posts/$postId'); 
       return true;
     } catch (e) {
-      print("❌ Lỗi xóa bài: $e");
+      print("Lỗi xóa bài: $e");
       return false;
     }
   }
 
-  // 2. Thêm bình luận (SỬA LẠI ĐỂ BẮT LỖI KỸ HƠN)
+  // 2. Thêm bình luận
   Future<dynamic> addComment(String postId, String content) async {
     try {
-      // Gọi API. Nếu thành công, nó trả về object comment vừa tạo
       final data = await api.post('/posts/$postId/comments', {
         'content': content,
       });
-      return data;
+      // Trả về data comment mới (hoặc PostModel mới tùy server trả về)
+      return data; 
     } catch (e) {
-      // 👇 IN LỖI RA ĐỂ BIẾT TẠI SAO MẤT COMMENT
-      print("❌ LỖI GỌI API COMMENT: $e");
-      return null;
-    }
-  }
-
-  // 3. Lấy chi tiết bài viết (Để load lại comment khi vào màn hình chi tiết)
-  Future<Map<String, dynamic>?> getPostDetails(String postId) async {
-    try {
-      final data = await api.getObject('/posts/$postId');
-      return data;
-    } catch (e) {
-      print("❌ Lỗi lấy chi tiết bài: $e");
+      print("Lỗi comment: $e");
       return null;
     }
   }

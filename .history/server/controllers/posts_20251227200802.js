@@ -135,9 +135,6 @@ export const likePost = async (req, res) => {
 
 // --- 👇 2 HÀM QUAN TRỌNG ĐỂ FIX LỖI 404 ---
 
-
-// --- 👇 2 HÀM QUAN TRỌNG ĐỂ FIX LỖI 404 ---
-
 // 1. LẤY CHI TIẾT 1 BÀI VIẾT
 export const getPost = async (req, res) => { 
     const { id } = req.params;

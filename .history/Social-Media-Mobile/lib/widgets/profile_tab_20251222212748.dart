@@ -499,7 +499,7 @@ class _ProfileTabState extends State<ProfileTab> with SingleTickerProviderStateM
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 2, mainAxisSpacing: 2),
                     itemBuilder: (context, index) {
                       return GestureDetector(
-                        onTap: () => _onTapPost(_posts[index]),
+                        onTap: () => _onTapPost(_posts[index]['imageUrl']),
                         child: Image.network(_posts[index]['imageUrl'], fit: BoxFit.cover),
                       );
                     },

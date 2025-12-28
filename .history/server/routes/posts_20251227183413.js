@@ -10,5 +10,5 @@ postRoutes.post("/", post.createPost);
 postRoutes.patch("/:id", post.updatePost);
 postRoutes.delete("/:id", post.deletePost);
 postRoutes.patch("/:id/likePost", post.likePost);
-postRoutes.post("/:id/comments", post.commentPost);
+
 export default postRoutes;

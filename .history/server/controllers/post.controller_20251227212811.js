@@ -1,5 +1,5 @@
-import { Comment } from "../models/comment.model.js";
 import { Post } from "../models/post.model.js";
+import { Comment } from "../models/comment.model.js";
 
 // 1. TẠO BÀI VIẾT
 export const createPost = async (req, res) => {

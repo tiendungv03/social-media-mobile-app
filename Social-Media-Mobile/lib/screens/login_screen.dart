@@ -1,8 +1,9 @@
 // lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
-import '../main.dart'; // Để dùng authService toàn cục
-import 'home_screen.dart'; // Import để chuyển sang màn hình Home
+import 'package:shared_preferences/shared_preferences.dart'; // 👇 1. Import thư viện này để lưu UserID
+import '../main.dart'; // Để dùng authService và apiClient toàn cục
+import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,7 +25,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // 👇 1. Gọi API Login
+      // Gọi API Login
       final data = await authService.login(
         _usernameCtl.text.trim(),
         _passwordCtl.text.trim(),
@@ -32,35 +33,51 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (!mounted) return;
 
-      // 👇 2. IN LOG RA CONSOLE ĐỂ DEBUG (Quan trọng)
       print("🔍 DATA TẠI LOGIN SCREEN: $data");
 
-      // 👇 3. LẤY ID AN TOÀN (Tránh lỗi Null)
-      // Ép kiểu data['user'] thành Map để truy cập an toàn
-      final userObj = data['user'] is Map ? data['user'] as Map<String, dynamic> : null;
+      // --- BẮT ĐẦU PHẦN SỬA ĐỔI QUAN TRỌNG ---
 
-      // Tìm ID ở mọi ngóc ngách có thể (user._id, user.id, data._id, data.id)
+      // 1. Lấy Token từ dữ liệu trả về
+      final token = data['token'];
+      if (token == null || token.toString().isEmpty) {
+        throw Exception("Lỗi: Server không trả về Token.");
+      }
+
+      // 2. Lấy User ID an toàn
+      final userObj = data['user'] is Map ? data['user'] as Map<String, dynamic> : null;
       String? userId = userObj?['_id'] ?? userObj?['id'] ?? data['_id'] ?? data['id'];
 
-      // 👇 4. KIỂM TRA LẠI LẦN CUỐI
       if (userId == null) {
-        throw Exception("Lỗi: Không tìm thấy ID người dùng.\nDữ liệu server trả về: $data");
+        throw Exception("Lỗi: Không tìm thấy ID người dùng.");
       }
 
       print("✅ Đã tìm thấy User ID: $userId");
 
-      // 👇 5. CHUYỂN TRANG
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(currentUserId: userId!),
-        ),
-      );
+      // 3. 👇 QUAN TRỌNG: LƯU DỮ LIỆU VÀO BỘ NHỚ MÁY
+      // Bước này giúp main.dart có dữ liệu để tự động đăng nhập lần sau
+
+      // a. Lưu Token (Hàm này trong ApiClient đã có lệnh lưu vào SharedPreferences key 'auth_token')
+      await apiClient.setToken(token);
+
+      // b. Lưu UserID (Để main.dart đọc được)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userId', userId);
+
+      // --- KẾT THÚC PHẦN SỬA ĐỔI ---
+
+      // 4. Chuyển trang
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(currentUserId: userId!),
+          ),
+        );
+      }
 
     } catch (e) {
       print("❌ Lỗi đăng nhập: $e");
       setState(() {
-        // Hiển thị lỗi ngắn gọn cho người dùng đỡ sợ
         _error = e.toString().contains("Exception:")
             ? e.toString().replaceAll("Exception: ", "")
             : "Đăng nhập thất bại. Vui lòng thử lại.";
@@ -74,23 +91,21 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // --- PHẦN GIAO DIỆN (UI) GIỮ NGUYÊN NHƯ CŨ ---
+  // --- PHẦN UI GIỮ NGUYÊN KHÔNG ĐỔI ---
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
       labelStyle: const TextStyle(color: Colors.grey),
       filled: true,
       fillColor: const Color(0xFFF2F2F2),
-      contentPadding:
-      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide:
-        const BorderSide(color: Color(0xFFBDBDBD), width: 0.7),
+        borderSide: const BorderSide(color: Color(0xFFBDBDBD), width: 0.7),
       ),
     );
   }
@@ -215,14 +230,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ],
                 ),
-                // (Giữ nguyên phần còn lại của UI như nút Google, Sign up...)
                 const SizedBox(height: 12),
                 TextButton.icon(
                   onPressed: () {
                     // TODO: Google Sign-In
                   },
                   icon: const Icon(
-                    Icons.g_mobiledata, // icon G tạm
+                    Icons.g_mobiledata,
                     color: Colors.red,
                     size: 26,
                   ),
