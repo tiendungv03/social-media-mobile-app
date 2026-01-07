@@ -3,8 +3,7 @@ import authRoutes from "./auth.routes.js";
 import commentRoutes from "./comment.routes.js";
 import friendRoutes from "./friend.routes.js";
 import postRoutes from "./post.routes.js";
-import userRoutes from "./users.js"; // 👈 1. THÊM IMPORT NÀY (File users.js ta vừa sửa lúc nãy)
-
+import userRoutes from "./users.routes.js";
 
 const router = Router();
 
