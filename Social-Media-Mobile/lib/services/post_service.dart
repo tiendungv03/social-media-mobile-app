@@ -1,15 +1,43 @@
 // lib/services/post_service.dart
+import 'dart:convert'; // 👈 THÊM DÒNG NÀY VÀO TRÊN CÙNG
 import '../models/post.dart';
 import 'api_client.dart';
+import '../models/comment.dart';
 
 class PostService {
   final ApiClient api;
   PostService(this.api);
 
   // --- CÁC HÀM CŨ (GIỮ NGUYÊN) ---
+// 1. Lấy News Feed
   Future<List<PostModel>> getFeed() async {
-    final list = await api.getList('/posts');
-    return list.map((e) => PostModel.fromJson(e)).toList();
+    try {
+      // 2. Dùng biến 'api' toàn cục để gọi (đã có Token)
+      final response = await api.get('/posts');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((item) => PostModel.fromJson(item)).toList();
+      }
+      throw Exception('Lỗi: ${response.statusCode} - ${jsonDecode(response.body)['message']}');
+    } catch (e) {
+      // Bắt lỗi No token tại đây
+      rethrow;
+    }
+  }
+
+  // 2. Thả tim
+  Future<int> toggleLike(String postId) async {
+    try {
+      final response = await api.post('/posts/$postId/like', {});
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return (data['likes'] ?? 0) as int;
+      }
+      return 0;
+    } catch (e) {
+      return 0;
+    }
   }
 
   Future<List<PostModel>> getUserPosts(String userId) async {
@@ -30,10 +58,6 @@ class PostService {
     return PostModel.fromJson(data);
   }
 
-  Future<int> toggleLike(String postId) async {
-    final data = await api.post('/posts/$postId/like', {});
-    return (data['likes'] ?? 0) as int;
-  }
 
   // --- 👇 3 HÀM QUAN TRỌNG ĐÃ ĐƯỢC CẬP NHẬT ---
 
@@ -49,15 +73,26 @@ class PostService {
   }
 
   // 2. Thêm bình luận (SỬA LẠI ĐỂ BẮT LỖI KỸ HƠN)
-  Future<dynamic> addComment(String postId, String content) async {
+  Future<CommentModel?> addComment(String postId, String content) async {
     try {
-      // Gọi API. Nếu thành công, nó trả về object comment vừa tạo
-      final data = await api.post('/posts/$postId/comments', {
+      print("🚀 Đang gửi comment: $content");
+
+      final response = await api.post('/posts/$postId/comments', {
         'content': content,
       });
-      return data;
+
+      print("📡 Server trả về: ${response.statusCode} - ${response.body}");
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonMap = jsonDecode(response.body);
+
+        // 👇 SỬA LẠI: Dùng 'Comment' thay vì 'CommentModel'
+        return CommentModel.fromJson(jsonMap);
+      } else {
+        print("❌ Server từ chối: ${response.body}");
+        return null;
+      }
     } catch (e) {
-      // 👇 IN LỖI RA ĐỂ BIẾT TẠI SAO MẤT COMMENT
       print("❌ LỖI GỌI API COMMENT: $e");
       return null;
     }

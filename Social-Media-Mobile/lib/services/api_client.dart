@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart'; // 👈 1. Import thư viện này
 
 class ApiClient {
+  static String? token;
   // Singleton
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
@@ -55,25 +56,25 @@ class ApiClient {
   }
 
   // --- 1. POST ---
-  Future<Map<String, dynamic>> post(
-      String path,
-      Map<String, dynamic> body,
-      ) async {
-    final uri = Uri.parse('$baseUrl$path');
-    final res = await http.post(uri, headers: _headers(), body: jsonEncode(body));
+  Future<http.Response> post(String path, dynamic body) async {
+    final url = Uri.parse('$baseUrl$path');
 
-    final ct = res.headers['content-type'] ?? '';
-    if (!ct.contains('application/json')) {
-      final body = res.body;
-      final preview = body.length > 100 ? body.substring(0, 100) : body;
-      throw Exception('Not JSON (POST): ${res.statusCode} $preview');
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+    };
+    if (token != null && token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
     }
 
-    final data = jsonDecode(res.body) as Map<String, dynamic>;
-    if (res.statusCode >= 400) {
-      throw Exception(data['message'] ?? 'Error');
-    }
-    return data;
+    // 👇 QUAN TRỌNG: Không dùng jsonDecode ở đây!
+    // Hãy trả về nguyên 'response' để bên ngoài tự xử lý (tự check statusCode)
+    final response = await http.post(
+        url,
+        headers: headers,
+        body: jsonEncode(body)
+    );
+
+    return response;
   }
 
   // --- 2. GET OBJECT ---
@@ -131,4 +132,49 @@ class ApiClient {
       throw Exception('Lỗi xóa dữ liệu: ${response.statusCode}');
     }
   }
+
+
+  //Nhiệm vụ của nó là đi lên Server để lấy dữ liệu về (ví dụ: lấy danh sách bài viết, lấy thông tin cá nhân, tìm kiếm bạn bè...).
+  Future<http.Response> get(String path) async {
+    final url = Uri.parse('$baseUrl$path');
+
+    // Tạo headers cơ bản
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+    };
+
+    // 👇 KIỂM TRA THÔNG MINH: Nếu có token thì nhét vào, không thì thôi
+    if (token != null && token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    final response = await http.get(url, headers: headers);
+    return response;
+  }
+
+
+
+// 👇 THÊM HÀM NÀY VÀO (Để sửa lỗi hàm put)
+  Future<http.Response> put(String path, dynamic body) async {
+    final url = Uri.parse('$baseUrl$path');
+
+    // Tạo headers
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+    };
+    // Nếu có token thì gửi kèm
+    if (token != null && token!.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    // Gửi yêu cầu PUT
+    final response = await http.put(
+      url,
+      headers: headers,
+      body: jsonEncode(body), // Chuyển body thành JSON
+    );
+
+    return response;
+  }
+
 }

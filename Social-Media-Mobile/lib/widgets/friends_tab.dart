@@ -1,4 +1,83 @@
-// lib/widgets/friends_tab.dart
+// // lib/widgets/friends_tab.dart
+//
+// import 'package:flutter/material.dart';
+// import '../models/user.dart';
+// import '../services/friend_service.dart';
+// import '../screens/user_profile_screen.dart';
+//
+// class FriendsTab extends StatefulWidget {
+//   final String currentUserId;
+//
+//   const FriendsTab({super.key, required this.currentUserId});
+//
+//   @override
+//   State<FriendsTab> createState() => _FriendsTabState();
+// }
+//
+// class _FriendsTabState extends State<FriendsTab> {
+//   final FriendService _friendService = FriendService();
+//
+//   List<AppUser>? _users;
+//   bool _isLoading = true;
+//   String? _error;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _loadUsers();
+//   }
+//
+//   void _loadUsers() async {
+//     try {
+//       final users = await _friendService.getFriendsList(widget.currentUserId);
+//       if (mounted) {
+//         setState(() {
+//           _users = users;
+//           _isLoading = false;
+//         });
+//       }
+//     } catch (e) {
+//       if (mounted) {
+//         setState(() {
+//           _error = e.toString();
+//           _isLoading = false;
+//         });
+//       }
+//     }
+//   }
+//
+//   // 1. Hàm GỬI lời mời
+//   void _handleSendRequest(AppUser user, int index) async {
+//     setState(() {
+//       if (_users != null) _users![index] = user.copyWith(status: 'pending');
+//     });
+//
+//     bool success = await _friendService.sendFriendRequest(widget.currentUserId, user.id);
+//
+//     if (!success) {
+//       setState(() {
+//         if (_users != null) _users![index] = user.copyWith(status: 'none');
+//       });
+//       if (mounted) {
+//         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lỗi gửi lời mời')));
+//       }
+//     }
+//   }
+//
+//   // 2. Hàm HỦY lời mời (Đây là hàm bạn đang bị thiếu)
+//   void _handleCancelRequest(AppUser user, int index) async {
+//     setState(() {
+//       if (_users != null) _users![index] = user.copyWith(status: 'none');
+//     });
+//
+//     bool success = await _friendService.cancelFriendRequest(widget.currentUserId, user.id);
+//
+//     if (!success) {
+//       setState(() {
+//         if (_users != null) _users![index] = user.copyWith(status: 'pending');
+//       });
+
+
 
 import 'package:flutter/material.dart';
 import '../models/user.dart';
@@ -15,7 +94,10 @@ class FriendsTab extends StatefulWidget {
 }
 
 class _FriendsTabState extends State<FriendsTab> {
-  final FriendService _friendService = FriendService();
+  // Vì mình đã khai báo 'friendService' toàn cục ở file service rồi,
+  // nên ở đây dùng trực tiếp biến đó hoặc khởi tạo mới đều được.
+  // Để an toàn, dùng biến toàn cục import từ file service:
+  final _service = friendService;
 
   List<AppUser>? _users;
   bool _isLoading = true;
@@ -29,7 +111,7 @@ class _FriendsTabState extends State<FriendsTab> {
 
   void _loadUsers() async {
     try {
-      final users = await _friendService.getFriendsList(widget.currentUserId);
+      final users = await _service.getFriendsList(widget.currentUserId);
       if (mounted) {
         setState(() {
           _users = users;
@@ -52,7 +134,9 @@ class _FriendsTabState extends State<FriendsTab> {
       if (_users != null) _users![index] = user.copyWith(status: 'pending');
     });
 
-    bool success = await _friendService.sendFriendRequest(widget.currentUserId, user.id);
+    // 👇 ĐÃ SỬA: Chỉ truyền user.id (không truyền widget.currentUserId nữa)
+    bool success = await _service.sendFriendRequest(widget.currentUserId,user.id);
+
 
     if (!success) {
       setState(() {
@@ -64,13 +148,14 @@ class _FriendsTabState extends State<FriendsTab> {
     }
   }
 
-  // 2. Hàm HỦY lời mời (Đây là hàm bạn đang bị thiếu)
+  // 2. Hàm HỦY lời mời
   void _handleCancelRequest(AppUser user, int index) async {
     setState(() {
       if (_users != null) _users![index] = user.copyWith(status: 'none');
     });
 
-    bool success = await _friendService.cancelFriendRequest(widget.currentUserId, user.id);
+    // 👇 ĐÃ SỬA: Chỉ truyền user.id
+    bool success = await _service.cancelFriendRequest(widget.currentUserId,user.id);
 
     if (!success) {
       setState(() {
@@ -79,13 +164,14 @@ class _FriendsTabState extends State<FriendsTab> {
     }
   }
 
-  // 3. Hàm CHẤP NHẬN lời mời (Mới thêm)
+  // 3. Hàm CHẤP NHẬN lời mời
   void _handleAcceptRequest(AppUser user, int index) async {
     setState(() {
       if (_users != null) _users![index] = user.copyWith(status: 'friend');
     });
 
-    bool success = await _friendService.acceptFriendRequest(widget.currentUserId, user.id);
+    // 👇 ĐÃ SỬA: Chỉ truyền user.id
+    bool success = await _service.acceptFriendRequest(widget.currentUserId,user.id);
 
     if (!success) {
       setState(() {
@@ -96,9 +182,22 @@ class _FriendsTabState extends State<FriendsTab> {
 
   Widget buildFriendButton(AppUser user, int index) {
     if (user.status == 'friend' || user.status == 'accepted') {
-      return const Icon(Icons.check, color: Colors.green);
+      // ✅ Code mới: Hiện nút "Bạn bè" màu xám (Giống Facebook/Insta)
+      return OutlinedButton.icon(
+        onPressed: () {
+          // Có thể thêm hành động: Nhắn tin hoặc Hủy kết bạn
+          _handleCancelRequest(user, index); // Ví dụ: Bấm vào thì hủy bạn
+        },
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: Colors.grey.shade300),
+          foregroundColor: Colors.black87,
+        ),
+        icon: const Icon(Icons.check, size: 16, color: Colors.green),
+        label: const Text("Bạn bè"),
+      );
+
+
     } else if (user.status == 'pending') {
-      // Mình gửi cho họ -> Nút "Đã gửi" (Màu cam) -> Bấm vào để Hủy
       return TextButton.icon(
         style: TextButton.styleFrom(
           backgroundColor: Colors.orange[50],
@@ -109,7 +208,6 @@ class _FriendsTabState extends State<FriendsTab> {
         onPressed: () => _handleCancelRequest(user, index),
       );
     } else if (user.status == 'pending_received') {
-      // Họ gửi cho mình -> Nút "Chấp nhận" (Màu xanh)
       return ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.blue[700],
@@ -121,7 +219,6 @@ class _FriendsTabState extends State<FriendsTab> {
         child: const Text("Chấp nhận"),
       );
     } else {
-      // Người lạ -> Nút kết bạn
       return IconButton(
         icon: const Icon(Icons.person_add, color: Colors.blue),
         onPressed: () => _handleSendRequest(user, index),
@@ -151,6 +248,7 @@ class _FriendsTabState extends State<FriendsTab> {
                 MaterialPageRoute(
                   builder: (context) => UserProfileScreen(
                     user: user,
+                    userId: user.id,
                     currentUserId: widget.currentUserId,
                   ),
                 ),

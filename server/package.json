@@ -17,8 +17,10 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "firebase-admin": "^13.6.0",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^9.0.0"
+    "mongoose": "^9.0.0",
+    "multer": "^2.0.2"
   },
   "optionalDependencies": {
     "mongodb-memory-server": "^8.11.0"
