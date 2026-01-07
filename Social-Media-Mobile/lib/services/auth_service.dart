@@ -96,4 +96,27 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('userId');
   }
+
+
+  // 👇👇👇 QUÊN MẬT KHẨU
+  Future<Map<String, dynamic>?> forgotPassword(String email) async {
+    try {
+      final res = await api.post('/auth/forgot-password', {
+        'email': email,
+      });
+
+      final data = jsonDecode(res.body) as Map<String, dynamic>;
+
+      if (res.statusCode >= 400) {
+        throw Exception(data['message'] ?? 'Gửi email quên mật khẩu thất bại');
+      }
+
+      return data;
+    } catch (e) {
+      print("❌ Lỗi forgotPassword: $e");
+      return null;
+    }
+  }
+
+
 }

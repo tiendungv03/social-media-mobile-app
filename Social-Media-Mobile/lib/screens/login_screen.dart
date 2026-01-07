@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../main.dart'; // dùng apiClient + authService global
 import '../services/google_auth_service.dart';
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 import 'register_screen.dart'; // nhớ tạo màn này
 
@@ -244,10 +245,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 14),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  );},
                   child: const Text(
                     'Forgot password?',
-                    style: TextStyle(color: Colors.grey, fontSize: 13),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
 

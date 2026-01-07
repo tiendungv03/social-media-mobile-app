@@ -52,12 +52,22 @@ class PostService {
       String imageUrl,
       List<String> tags,
       ) async {
-    final data = await api.post('/posts', {
+    // 1. Gọi API
+    final response = await api.post('/posts', {
       'caption': caption,
       'imageUrl': imageUrl,
       'tags': tags,
     });
-    return PostModel.fromJson(data);
+
+    // 2. Kiểm tra thành công (200 OK hoặc 201 Created)
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // 3. QUAN TRỌNG: Phải decode body từ String sang Map
+      final jsonMap = jsonDecode(response.body);
+      return PostModel.fromJson(jsonMap);
+    } else {
+      // 4. Nếu lỗi thì ném ra Exception để UI bắt được
+      throw Exception('Lỗi tạo bài viết: ${response.body}');
+    }
   }
 
 
