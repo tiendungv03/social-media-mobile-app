@@ -1,3 +1,6 @@
+import crypto from "crypto";
+import sendEmail from "../untils/sendEmail.js";
+
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
@@ -12,9 +15,23 @@ const genToken = (user) => {
   });
 };
 
+
+
 export const register = async (req, res) => {
   try {
     const { name, username, email, password } = req.body;
+
+    if (!name || !username || !email || !password) {
+  return res.status(400).json({
+    message: "Missing required fields",
+  });
+}
+
+if (password.length < 6) {
+  return res.status(400).json({
+    message: "Password must be at least 6 characters",
+  });
+}
 
     const exist = await User.findOne({
       $or: [{ email }, { username }],
@@ -100,3 +117,94 @@ export const me = async (req, res) => {
     },
   });
 };
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Không leak email tồn tại hay không
+    if (!user) {
+      return res.json({
+        message: "Nếu email tồn tại, link reset sẽ được gửi",
+      });
+    }
+
+    // Tạo token gốc
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // Hash token lưu DB
+    user.resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
+
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 phút
+
+    await user.save();
+
+    const resetUrl =
+      `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: "Reset mật khẩu",
+      html: `
+        <p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
+        <p>Link có hiệu lực 15 phút:</p>
+        <a href="${resetUrl}">${resetUrl}</a>
+      `,
+    });
+
+    return res.json({ message: "Reset email sent" });
+  } catch (e) {
+    console.error("FORGOT PASSWORD ERROR 👉", e);
+    return res.status(500).json({ message: e.message });
+  }
+};
+
+
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        message: "Invalid token or password too short",
+      });
+    }
+
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Token không hợp lệ hoặc đã hết hạn",
+      });
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+
+    await user.save();
+
+    return res.json({ message: "Đổi mật khẩu thành công" });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: "Reset password error" });
+  }
+};
+

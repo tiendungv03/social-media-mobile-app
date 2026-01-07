@@ -89,4 +89,11 @@ class AuthService {
 
     print("✅ Đã đăng xuất thành công!");
   }
+
+  // 👇👇👇 QUÊN MẬT KHẨU
+  Future<Map<String, dynamic>> forgotPassword(String email) {
+    return api.post('/auth/forgot-password', {
+      'email': email,
+    });
+  }
 }

@@ -3,7 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // 👇 1. Import thư viện này để lưu UserID
 import '../main.dart'; // Để dùng authService và apiClient toàn cục
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
+
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -192,7 +195,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 const SizedBox(height: 14),
                 TextButton(
-                  onPressed: () {},
+                  onPressed: () {Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ForgotPasswordScreen(),
+                    ),
+                  );},
                   child: const Text(
                     'Forgot password?',
                     style: TextStyle(
@@ -272,7 +280,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       GestureDetector(
                         onTap: () {
-                          // TODO: chuyển sang màn Register
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const RegisterScreen(),
+                            ),
+                          );
                         },
                         child: const Text(
                           'Sign up.',

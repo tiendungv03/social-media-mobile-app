@@ -8,6 +8,7 @@ import userRoutes from "./users.js"; // 👈 1. THÊM IMPORT NÀY (File users.js
 
 const router = Router();
 
+
 router.use("/auth", authRoutes);
 router.use("/posts", postRoutes);
 router.use("/comments", commentRoutes);
