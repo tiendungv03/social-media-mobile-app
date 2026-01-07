@@ -11,6 +11,5 @@ router.use("/auth", authRoutes);
 router.use("/posts", postRoutes);
 router.use("/comments", commentRoutes);
 router.use("/friends", friendRoutes);
-// 👇 2. THÊM DÒNG NÀY ĐỂ MỞ ĐƯỜNG CHO API PROFILE
 router.use("/users", userRoutes);
 export default router;

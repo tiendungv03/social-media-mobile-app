@@ -2,6 +2,8 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/user.model.js";
 import admin from "../config/firebaseAdmin.js";
+import { randomBytes, createHash } from "node:crypto";
+import sendEmail from "../untils/sendEmail.js";
 
 const genToken = (user) => {
   if (!process.env.JWT_SECRET) throw new Error("JWT_SECRET is missing in .env");
@@ -37,7 +39,6 @@ export const register = async (req, res) => {
       passwordHash: hash,
     });
 
-    // ✅ whitelist email lên Firestore để Google login so sánh
     if (emailKey) {
       try {
         await admin
@@ -82,7 +83,6 @@ export const register = async (req, res) => {
 // ✅ POST /api/auth/login
 export const login = async (req, res) => {
   try {
-    // hỗ trợ nhiều kiểu body (đỡ sửa Flutter)
     const { usernameOrEmail, username, password, passwordHash } = req.body;
 
     const key = (usernameOrEmail ?? username ?? "").trim().toLowerCase();
@@ -154,7 +154,6 @@ export const googleLogin = async (req, res) => {
     if (!email)
       return res.status(400).json({ message: "Google account has no email" });
 
-    // whitelist check
     const allowDoc = await admin
       .firestore()
       .collection("pre_registered_emails")
@@ -166,7 +165,6 @@ export const googleLogin = async (req, res) => {
       });
     }
 
-    // user mongo
     const user = await User.findOne({ email });
     if (!user)
       return res
@@ -214,50 +212,43 @@ export const me = async (req, res) => {
 
 export const forgotPassword = async (req, res) => {
   try {
-    const { email } = req.body;
-
-    if (!email) {
+    const emailKey = (req.body.email || "").trim().toLowerCase();
+    if (!emailKey) {
       return res.status(400).json({ message: "Email is required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: emailKey });
 
-    // Không leak email tồn tại hay không
     if (!user) {
-      return res.json({
-        message: "Nếu email tồn tại, link reset sẽ được gửi",
-      });
+      return res.json({ message: "Nếu email tồn tại, link reset sẽ được gửi" });
     }
 
-    // Tạo token gốc
-    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetToken = randomBytes(32).toString("hex");
 
-    // Hash token lưu DB
-    user.resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    const hashedToken = createHash("sha256").update(resetToken).digest("hex");
 
+    user.resetPasswordToken = hashedToken;
     user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 phút
-
     await user.save();
 
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+    const clientUrl = (process.env.CLIENT_URL || "").replace(/\/$/, "");
+    const resetUrl = `${clientUrl}/reset-password?token=${resetToken}`;
 
     await sendEmail({
       to: user.email,
       subject: "Reset mật khẩu",
       html: `
         <p>Bạn đã yêu cầu đặt lại mật khẩu.</p>
-        <p>Link có hiệu lực 15 phút:</p>
-        <a href="${resetUrl}">${resetUrl}</a>
+        <p>Link có hiệu lực <b>15 phút</b>:</p>
+        <p><a href="${resetUrl}">${resetUrl}</a></p>
+        <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>
       `,
     });
 
     return res.json({ message: "Reset email sent" });
   } catch (e) {
     console.error("FORGOT PASSWORD ERROR 👉", e);
-    return res.status(500).json({ message: e.message });
+    return res.status(500).json({ message: e.message || "Server error" });
   }
 };
 
