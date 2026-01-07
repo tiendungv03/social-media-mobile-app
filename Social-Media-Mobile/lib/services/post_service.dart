@@ -1,5 +1,7 @@
 // lib/services/post_service.dart
 import 'dart:convert'; // 👈 THÊM DÒNG NÀY VÀO TRÊN CÙNG
+import 'package:demo/main.dart';
+
 import '../models/post.dart';
 import 'api_client.dart';
 import '../models/comment.dart';
@@ -72,31 +74,58 @@ class PostService {
     }
   }
 
-  // 2. Thêm bình luận (SỬA LẠI ĐỂ BẮT LỖI KỸ HƠN)
-  Future<CommentModel?> addComment(String postId, String content) async {
+  // // 2. Thêm bình luận (SỬA LẠI ĐỂ BẮT LỖI KỸ HƠN)
+  // Future<CommentModel?> addComment(String postId, String content) async {
+  //   try {
+  //     print("🚀 Đang gửi comment: $content");
+  //
+  //     final response = await api.post('/posts/$postId/comments', {
+  //       'content': content,
+  //     });
+  //
+  //     print("📡 Server trả về: ${response.statusCode} - ${response.body}");
+  //
+  //     if (response.statusCode == 200 || response.statusCode == 201) {
+  //       final jsonMap = jsonDecode(response.body);
+  //
+  //       // 👇 SỬA LẠI: Dùng 'Comment' thay vì 'CommentModel'
+  //       return CommentModel.fromJson(jsonMap);
+  //     } else {
+  //       print("❌ Server từ chối: ${response.body}");
+  //       return null;
+  //     }
+  //   } catch (e) {
+  //     print("❌ LỖI GỌI API COMMENT: $e");
+  //     return null;
+  //   }
+  // }
+
+  // 2. Thêm bình luận (+ reply)
+  Future<CommentModel?> addComment(
+      String postId,
+      String content, {
+        String? parentId,
+      }) async {
     try {
-      print("🚀 Đang gửi comment: $content");
+      final body = <String, dynamic>{'content': content};
 
-      final response = await api.post('/posts/$postId/comments', {
-        'content': content,
-      });
+      if (parentId != null && parentId.isNotEmpty) {
+        body['parentId'] = parentId; // nếu BE dùng parentCommentId thì đổi key tại đây
+      }
 
-      print("📡 Server trả về: ${response.statusCode} - ${response.body}");
+      final response = await api.post('/posts/$postId/comments', body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final jsonMap = jsonDecode(response.body);
-
-        // 👇 SỬA LẠI: Dùng 'Comment' thay vì 'CommentModel'
         return CommentModel.fromJson(jsonMap);
-      } else {
-        print("❌ Server từ chối: ${response.body}");
-        return null;
       }
+      return null;
     } catch (e) {
       print("❌ LỖI GỌI API COMMENT: $e");
       return null;
     }
   }
+
 
   // 3. Lấy chi tiết bài viết (Để load lại comment khi vào màn hình chi tiết)
   Future<Map<String, dynamic>?> getPostDetails(String postId) async {
@@ -108,4 +137,33 @@ class PostService {
       return null;
     }
   }
+
+
+
+  // Hàm thả tim bình luận (Sửa POST thành PUT)
+  Future<bool> likeComment(String commentId) async {
+    try {
+      print("❤️ Đang thả tim comment: $commentId");
+
+      // 1. Thử dùng PUT (Đa số server dùng cái này để update)
+      // Đường dẫn: /api/comments/:id/like
+      final response = await api.put('/comments/$commentId/like', {});
+
+      // Nếu Server trả về 200 (OK) -> Thành công
+      if (response.statusCode == 200) {
+        return true;
+      }
+
+      // 2. Dự phòng: Nếu Server báo lỗi 404, có thể Server dùng đường dẫn khác
+      // Bạn hãy check lại Terminal Server xem nó in ra đường dẫn gì nhé!
+      print("❌ Lỗi Like Comment: ${response.statusCode} - ${response.body}");
+      return false;
+
+    } catch (e) {
+      print("❌ Exception Like: $e");
+      return false;
+    }
+  }
+
 }
+

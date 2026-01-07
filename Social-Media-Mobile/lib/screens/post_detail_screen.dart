@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../services/post_service.dart';
-import '../services/profile_service.dart';
+
 
 class PostDetailScreen extends StatefulWidget {
   final dynamic post;
@@ -10,7 +10,7 @@ class PostDetailScreen extends StatefulWidget {
   const PostDetailScreen({
     super.key,
     required this.post,
-    required this.currentUserId
+    required this.currentUserId,
   });
 
   @override
@@ -19,276 +19,421 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   final PostService _postService = PostService(ApiClient());
-  final ProfileService _profileService = ProfileService();
 
-  List<dynamic> comments = [];
+  String? _replyToCommentId;
+  String? _replyToUsername;
+
+  // Danh sách comment ĐÃ ĐƯỢC SẮP XẾP (Cha trước -> Con sau)
+  List<Map<String, dynamic>> displayComments = [];
   bool _hasNewComment = false;
-  Map<String, dynamic>? _myProfile;
 
   @override
   void initState() {
     super.initState();
-
-    // 1. Load tạm comment cũ từ màn hình Home gửi sang
-    try {
-      var initialComments = (widget.post is Map)
-          ? widget.post['comments']
-          : widget.post.comments;
-      if (initialComments != null) {
-        comments = List.from(initialComments);
-      }
-    } catch (e) {
-      print("Lỗi load comment cũ: $e");
-    }
-
-    // 2. Lấy thông tin nick của mình
-    _fetchMyProfile();
-
-    // 3. Gọi server lấy dữ liệu mới nhất (để hiển thị comment vừa đăng nếu có)
-    _fetchLatestPostData();
-  }
-
-  // --- HÀM 1: Lấy thông tin cá nhân ---
-  void _fetchMyProfile() async {
-    try {
-      final data = await _profileService.getUserProfile(widget.currentUserId, widget.currentUserId);
-      if (mounted) {
-        setState(() {
-          _myProfile = data['user'];
-        });
-      }
-    } catch (e) {
-      print("Lỗi lấy profile: $e");
-    }
-  }
-
-  // --- HÀM 2: Lấy dữ liệu bài viết mới nhất từ Server ---
-  void _fetchLatestPostData() async {
-    try {
-      String postId = (widget.post is Map) ? (widget.post['_id'] ?? widget.post['id']) : widget.post.id;
-
-      // 👇 THÊM DÒNG NÀY ĐỂ KIỂM TRA:
-      print("🔍 CHECK ID BÀI VIẾT: $postId");
-      if (postId == null || postId == 'null' || postId.isEmpty) {
-        print("❌ LỖI: ID bài viết bị rỗng!");
-        return;
-      }
-
-      final updatedPost = await _postService.getPostDetails(postId);
-
-      if (updatedPost != null && mounted) {
-        setState(() {
-          if (updatedPost['comments'] != null) {
-            comments = List.from(updatedPost['comments']);
-          }
-        });
-      }
-    } catch (e) {
-      print("Lỗi tải dữ liệu mới: $e");
-    }
-  }
-
-  // --- XỬ LÝ NÚT BACK ---
-  void _onPop() {
-    if (_hasNewComment) {
-      Navigator.pop(context, {'action': 'comment'});
-    } else {
-      Navigator.pop(context, null);
-    }
-  }
-
-  // --- XỬ LÝ XÓA BÀI ---
-  void _handleDeletePost() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text("Xóa bài viết?"),
-        content: const Text("Hành động này không thể hoàn tác."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Hủy")),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Xóa", style: TextStyle(color: Colors.red))),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      String postId = (widget.post is Map) ? (widget.post['_id'] ?? widget.post['id']) : widget.post.id;
-      final success = await _postService.deletePost(postId);
-      if (success && mounted) {
-        Navigator.pop(context, {'action': 'deleted'});
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Đã xóa bài viết!")));
-      }
-    }
-  }
-
-  // --- GỬI COMMENT (ĐÃ SỬA) ---
-  void _handleSendComment() async {
-    final content = _commentController.text.trim();
-    if (content.isEmpty) return;
-
-    String postId = (widget.post is Map) ? (widget.post['_id'] ?? widget.post['id']) : widget.post.id;
-
-    // Gọi API thêm comment
-    final newCommentFromServer = await _postService.addComment(postId, content);
-
-    if (mounted) {
-      // ✅ SỬA CHỖ NÀY: Chỉ thêm vào list khi Server trả về dữ liệu thành công
-      if (newCommentFromServer != null) {
-        setState(() {
-          comments.add(newCommentFromServer);
-          _commentController.clear();
-          _hasNewComment = true;
-        });
-      } else {
-        // ❌ NẾU LỖI: Hiện thông báo đỏ chứ KHÔNG thêm comment giả nữa
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Gửi thất bại! Hãy kiểm tra mạng hoặc đăng nhập lại."),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 2),
-            )
-        );
-      }
-    }
+    _loadComments();
   }
 
   @override
-  Widget build(BuildContext context) {
-    String imageUrl = (widget.post is Map) ? widget.post['imageUrl'] : widget.post.imageUrl;
-    String caption = (widget.post is Map) ? (widget.post['caption'] ?? "") : widget.post.caption;
+  void dispose() {
+    _commentController.dispose();
+    _commentFocusNode.dispose();
+    super.dispose();
+  }
 
-    String ownerId = '';
-    try {
-      if (widget.post is Map) {
-        if (widget.post['user'] is Map) ownerId = widget.post['user']['id'] ?? widget.post['user']['_id'] ?? '';
-        else ownerId = widget.post['user'] ?? '';
+  // ================== LOGIC SẮP XẾP COMMENT (QUAN TRỌNG NHẤT) ==================
+  // Hàm này biến danh sách lộn xộn thành: Cha -> Con của nó -> Cha tiếp theo...
+  List<Map<String, dynamic>> _organizeComments(List<dynamic> inputList) {
+    List<Map<String, dynamic>> rawList = List<Map<String, dynamic>>.from(inputList);
+
+    // 1. Tạo Map để gom nhóm: Key là ID cha, Value là danh sách các con
+    Map<String, List<Map<String, dynamic>>> childrenMap = {};
+    List<Map<String, dynamic>> rootComments = [];
+
+    // Phân loại Cha và Con
+    for (var c in rawList) {
+      String? parentId = c['parentId'];
+
+      // Nếu không có parentId hoặc parentId rỗng -> Là Cha (Root)
+      if (parentId == null || parentId.toString().isEmpty) {
+        rootComments.add(c);
       } else {
-        ownerId = widget.post.userId;
+        // Là Con -> Gom vào danh sách con của ParentId đó
+        if (!childrenMap.containsKey(parentId)) {
+          childrenMap[parentId] = [];
+        }
+        childrenMap[parentId]!.add(c);
       }
-    } catch (e) { ownerId = ''; }
-    bool isOwner = (ownerId == widget.currentUserId);
+    }
+
+    // 2. Dùng hàm đệ quy để trải phẳng danh sách theo thứ tự cây
+    List<Map<String, dynamic>> output = [];
+
+    void addNodeAndChildren(Map<String, dynamic> node) {
+      output.add(node); // Thêm cha vào danh sách hiển thị
+
+      String nodeId = node['_id'];
+      // Kiểm tra xem ông này có con không?
+      if (childrenMap.containsKey(nodeId)) {
+        // Nếu có, lôi hết con ra thêm vào ngay sau cha
+        for (var child in childrenMap[nodeId]!) {
+          addNodeAndChildren(child); // Đệ quy (để xử lý trường hợp con của con)
+        }
+      }
+    }
+
+    // Bắt đầu duyệt từ các ông Cha gốc
+    for (var root in rootComments) {
+      addNodeAndChildren(root);
+    }
+
+    return output;
+  }
+
+  // ================== LOAD COMMENTS ==================
+  Future<void> _loadComments() async {
+    try {
+      final postId = _getPostId();
+      if (postId.isEmpty) return;
+
+      final data = await _postService.getPostDetails(postId);
+      final List list = (data != null && data['comments'] != null && data['comments'] is List)
+          ? data['comments']
+          : [];
+
+      if (mounted) {
+        setState(() {
+          // Gọi hàm sắp xếp trước khi hiển thị
+          displayComments = _organizeComments(list);
+        });
+      }
+    } catch (e) {
+      debugPrint("❌ Load comments error: $e");
+    }
+  }
+
+  String _getPostId() {
+    return (widget.post is Map)
+        ? (widget.post['_id'] ?? widget.post['id'] ?? '')
+        : widget.post.id;
+  }
+
+  // ================== SEND COMMENT ==================
+  Future<void> _handleSendComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty) return;
+
+    final parentId = _replyToCommentId;
+
+    try {
+      final postId = _getPostId();
+      await _postService.addComment(postId, text, parentId: parentId);
+
+      _commentController.clear();
+      _hasNewComment = true;
+      FocusScope.of(context).unfocus(); // Ẩn bàn phím
+
+      setState(() {
+        _replyToCommentId = null;
+        _replyToUsername = null;
+      });
+
+      await _loadComments(); // Load lại để thấy comment mới chui vào đúng chỗ
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Gửi bình luận thất bại"), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  // ================== HELPER UI ==================
+  List<InlineSpan> _buildCommentContent(String content) {
+    if (content.startsWith('@') && content.contains(' ')) {
+      int firstSpaceIndex = content.indexOf(' ');
+      String userTag = content.substring(0, firstSpaceIndex);
+      String message = content.substring(firstSpaceIndex);
+
+      return [
+        TextSpan(
+          text: userTag,
+          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+        ),
+        TextSpan(text: message),
+      ];
+    }
+    return [TextSpan(text: content)];
+  }
+
+  void _onBack() {
+    Navigator.pop(context, _hasNewComment ? {'updated': true} : null);
+  }
+
+  // ================== MAIN BUILD ==================
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = widget.post is Map ? widget.post['imageUrl'] : widget.post.imageUrl;
+    final caption = widget.post is Map ? widget.post['caption'] ?? '' : widget.post.caption;
 
     return PopScope(
       canPop: false,
-      onPopInvokedWithResult: (didPop, result) { if (didPop) return; _onPop(); },
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _onBack();
+      },
       child: Scaffold(
-        backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0,
-          leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: _onPop),
-          title: const Text("Chi tiết", style: TextStyle(color: Colors.black)),
-          actions: [
-            if (isOwner) IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), onPressed: _handleDeletePost)
-          ],
+          leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: _onBack),
+          title: const Text("Chi tiết"),
         ),
         body: Column(
           children: [
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      color: Colors.black,
-                      width: double.infinity,
-                      constraints: const BoxConstraints(minHeight: 200, maxHeight: 500),
-                      child: Image.network(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[900],
-                            alignment: Alignment.center,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(Icons.image_not_supported, color: Colors.white54, size: 50),
-                                SizedBox(height: 8),
-                                Text("Ảnh bị lỗi hoặc bị chặn", style: TextStyle(color: Colors.white54)),
-                              ],
+              child: ListView(
+                padding: const EdgeInsets.all(12),
+                children: [
+                  Image.network(imageUrl, fit: BoxFit.cover),
+                  if (caption.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(caption, style: const TextStyle(fontSize: 16)),
+                    const Divider(),
+                  ],
+                  const Text("Bình luận", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+
+                  if (displayComments.isEmpty)
+                    const Center(child: Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text("Chưa có bình luận nào"),
+                    ))
+                  else
+                  // Dùng list đã sắp xếp (displayComments)
+                    ...displayComments.map((c) {
+                      final owner = c['owner'] as Map<String, dynamic>?;
+                      final username = owner?['username'] ?? 'User';
+                      final avatar = owner?['avatarUrl'] ?? '';
+                      final content = c['content'] ?? '';
+                      final String commentId = (c['_id'] ?? '').toString();
+
+                      // Kiểm tra xem đây có phải là comment con không (có parentId)
+                      final bool isReply = (c['parentId'] != null && c['parentId'].toString().isNotEmpty);
+
+                      // Likes Logic
+                      // Likes Logic (FIX: handle String or populated user object)
+                      final List rawLikes = (c['likes'] as List?) ?? [];
+
+                      final Set<String> likes = rawLikes.map((e) {
+                        if (e is String) return e;
+                        if (e is Map && e['_id'] != null) return e['_id'].toString(); // populated user
+                        return e.toString();
+                      }).toSet();
+
+                      final String myId = widget.currentUserId.toString();
+                      final bool isLiked = likes.contains(myId);
+                      final int likeCount = likes.length;
+
+
+                      return Padding(
+                        // 🔥 ĐÂY LÀ CHỖ TẠO THỤT ĐẦU DÒNG
+                        // Nếu là reply -> Thụt vào 45px, ngược lại -> 0
+                        padding: EdgeInsets.only(
+                            bottom: 12,
+                            left: isReply ? 45.0 : 0.0
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Avatar logic: Reply thì nhỏ hơn (size 12), Gốc thì to (size 18)
+                            CircleAvatar(
+                              radius: isReply ? 14 : 18,
+                              backgroundImage: avatar.isNotEmpty ? NetworkImage(avatar) : null,
+                              child: avatar.isEmpty ? Icon(Icons.person, size: isReply ? 14 : 18) : null,
                             ),
-                          );
-                        },
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (caption.isNotEmpty) ...[
-                            Text(caption, style: const TextStyle(fontSize: 16)),
-                            const SizedBox(height: 10),
-                            const Divider(),
-                          ],
-                          const Text("Bình luận", style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 10),
-                          comments.isEmpty
-                              ? const Padding(padding: EdgeInsets.only(top: 20), child: Center(child: Text("Chưa có bình luận nào.", style: TextStyle(color: Colors.grey))))
-                              : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: comments.length,
-                            itemBuilder: (context, index) {
-                              final c = comments[index];
-                              String content = c is Map ? (c['content'] ?? "") : c.toString();
+                            const SizedBox(width: 10),
 
-                              String username = "User";
-                              String avatar = "";
-
-                              if (c is Map) {
-                                // 👇 SỬA Ở ĐÂY: Ưu tiên lấy 'owner' (Code mới), nếu không có thì lấy 'user' (Code cũ)
-                                final userObj = c['owner'] ?? c['user'];
-
-                                if (userObj is Map) {
-                                  // Lấy username hoặc name tùy bạn
-                                  username = userObj['username'] ?? "User";
-                                  // Nếu muốn hiện tên thật (BUI DIEU) thì dùng dòng dưới này:
-                                  // username = userObj['name'] ?? userObj['username'] ?? "User";
-
-                                  avatar = userObj['avatarUrl'] ?? "";
-                                } else if (c['username'] != null) {
-                                  username = c['username'];
-                                }
-                              }
-
-                              return ListTile(
-                                contentPadding: EdgeInsets.zero,
-                                leading: CircleAvatar(
-                                  radius: 16,
-                                  backgroundColor: Colors.grey[200],
-                                  backgroundImage: (avatar.isNotEmpty) ? NetworkImage(avatar) : null,
-                                  child: avatar.isEmpty ? const Icon(Icons.person, size: 16) : null,
-                                ),
-                                title: RichText(
-                                  text: TextSpan(
-                                    style: const TextStyle(color: Colors.black, fontSize: 14),
-                                    children: [
-                                      TextSpan(text: "$username ", style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      TextSpan(text: content),
-                                    ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Tên + Nội dung
+                                  RichText(
+                                    text: TextSpan(
+                                      style: const TextStyle(color: Colors.black, fontSize: 14),
+                                      children: [
+                                        TextSpan(
+                                          text: "$username ",
+                                          style: const TextStyle(fontWeight: FontWeight.bold),
+                                        ),
+                                        ..._buildCommentContent(content),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          )
-                        ],
-                      ),
+
+                                  const SizedBox(height: 4),
+
+                                  // Nút Like + Reply
+                                  Row(
+                                    children: [
+                                      // ❤️ LIKE BUTTON
+                                      // ❤️ LIKE BUTTON (ĐÃ FIX LỖI MẤT TIM)
+                                      Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(20),
+                                          onTap: () async {
+                                            // 1. Debug xem ID đang xử lý là gì
+                                            debugPrint("❤️ Thao tác Like comment: $commentId");
+
+                                            setState(() {
+                                              // Lấy danh sách like hiện tại của comment này
+                                              List currentLikes = (c['likes'] as List?) ?? [];
+
+                                              if (isLiked) {
+                                                // 🔴 UNLIKE (BỎ TIM)
+                                                currentLikes.removeWhere((item) {
+                                                  String itemId = (item is Map) ? item['_id'].toString() : item.toString();
+                                                  return itemId == widget.currentUserId.toString();
+                                                });
+                                              } else {
+                                                // 🟢 LIKE (THẢ TIM)
+                                                currentLikes.add(widget.currentUserId);
+                                              }
+                                              c['likes'] = currentLikes; // Cập nhật UI ngay lập tức
+                                            });
+
+                                            // 2. Gọi API
+                                            try {
+                                              await _postService.likeComment(commentId);
+                                            } catch (e) {
+                                              // 🔥 PHẦN QUAN TRỌNG MỚI THÊM: Hiện lỗi ra màn hình
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text("Lỗi thả tim: $e"), // In lỗi chi tiết
+                                                    backgroundColor: Colors.red,
+                                                    duration: const Duration(seconds: 3),
+                                                  ),
+                                                );
+                                              }
+
+                                              debugPrint("❌ Lỗi API Like: $e");
+
+                                              // Load lại danh sách để hoàn tác (revert) trạng thái tim về cũ
+                                              await _loadComments();
+                                            }
+                                          },
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(0, 4, 12, 4),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  isLiked ? Icons.favorite : Icons.favorite_border,
+                                                  size: 14,
+                                                  color: isLiked ? Colors.red : Colors.grey,
+                                                ),
+                                                if (likeCount > 0) ...[
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    likeCount.toString(),
+                                                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+
+                                      // 💬 REPLY BUTTON
+                                      Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(5),
+                                          onTap: () {
+                                            setState(() {
+                                              // LOGIC THÔNG MINH:
+                                              // Nếu bấm reply vào một reply khác -> Lấy ID cha gốc của nó để gom nhóm
+                                              String realParentId = (isReply) ? c['parentId'] : commentId;
+
+                                              _replyToCommentId = realParentId;
+                                              _replyToUsername = username;
+
+                                              _commentController.text = "@$username ";
+                                              _commentController.selection = TextSelection.fromPosition(
+                                                  TextPosition(offset: _commentController.text.length)
+                                              );
+                                            });
+                                            FocusScope.of(context).requestFocus(_commentFocusNode);
+                                          },
+                                          child: const Padding(
+                                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            child: Text("Reply", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+
+            // Thanh hiển thị "Đang trả lời..."
+            if (_replyToUsername != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                color: Colors.grey[200],
+                child: Row(
+                  children: [
+                    Expanded(child: Text("Đang trả lời @$_replyToUsername", style: const TextStyle(fontSize: 13))),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _replyToCommentId = null;
+                          _replyToUsername = null;
+                          _commentController.clear();
+                          FocusScope.of(context).unfocus();
+                        });
+                      },
+                      child: const Icon(Icons.close, size: 18),
                     )
                   ],
                 ),
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(color: Colors.white, border: Border(top: BorderSide(color: Colors.grey[300]!))),
-              child: Row(
-                children: [
-                  Expanded(child: TextField(controller: _commentController, decoration: const InputDecoration(hintText: "Thêm bình luận...", border: InputBorder.none, isDense: true))),
-                  IconButton(icon: const Icon(Icons.send, color: Colors.blue), onPressed: _handleSendComment),
-                ],
+
+            // Input Area
+            SafeArea(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.grey[300]!)),
+                  color: Colors.white,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        focusNode: _commentFocusNode,
+                        decoration: const InputDecoration(
+                          hintText: "Thêm bình luận...",
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.send, color: Colors.blue),
+                      onPressed: _handleSendComment,
+                    )
+                  ],
+                ),
               ),
             )
           ],
