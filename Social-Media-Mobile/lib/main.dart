@@ -5,6 +5,9 @@ import 'services/auth_service.dart';
 import 'services/post_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+
+import 'firebase_options.dart';
 
 // Khởi tạo các Service
 // Vì ApiClient là Singleton nên gọi ApiClient() ở đâu cũng là một instance duy nhất
@@ -15,6 +18,11 @@ final postService = PostService(apiClient);
 void main() async {
   // 1. Đảm bảo Flutter binding đã khởi tạo
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
 
   // 2. 👇 QUAN TRỌNG: Gọi hàm này để ApiClient tự nạp Token từ ổ cứng lên RAM
   // Nếu không có dòng này, ApiClient sẽ bị rỗng (No token) dù đã đăng nhập.

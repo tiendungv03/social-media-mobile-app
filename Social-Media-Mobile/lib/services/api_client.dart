@@ -21,31 +21,30 @@ class ApiClient {
   // 👇 2. SỬA HÀM NÀY: Lưu token vào bộ nhớ máy (Cần async)
   Future<void> setToken(String token) async {
     _token = token;
+    ApiClient.token = token; // ✅ thêm dòng này
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token); // Lưu vĩnh viễn
-    if (kDebugMode) {
-      print("✅ ApiClient đã lưu token vào bộ nhớ máy: $token");
-    }
+    await prefs.setString('auth_token', token);
   }
+
 
   // 👇 3. THÊM HÀM NÀY: Để khôi phục token khi vừa mở App (F5)
   Future<void> loadTokenFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
-    if (_token != null) {
-      if (kDebugMode) print("✅ Đã khôi phục Token từ bộ nhớ: $_token");
-    } else {
-      if (kDebugMode) print("⚠️ Không tìm thấy Token cũ.");
-    }
+    ApiClient.token = _token; // ✅ thêm dòng này
   }
+
 
   // 👇 4. THÊM HÀM NÀY: Đăng xuất và xóa token
   Future<void> logout() async {
     _token = null;
+    ApiClient.token = null; // ✅ thêm
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
-    print("👋 Đã đăng xuất và xóa Token.");
   }
+
 
   Map<String, String> _headers() {
     final h = <String, String>{'Content-Type': 'application/json'};
