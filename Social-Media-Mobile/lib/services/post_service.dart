@@ -35,6 +35,11 @@ class PostService {
     return (data['likes'] ?? 0) as int;
   }
 
+  Future<void> likeComment(String commentId) async {
+    await api.post('/comments/$commentId/like',{});
+  }
+
+
   // --- 👇 3 HÀM QUAN TRỌNG ĐÃ ĐƯỢC CẬP NHẬT ---
 
   // 1. Xóa bài viết
@@ -48,20 +53,39 @@ class PostService {
     }
   }
 
-  // 2. Thêm bình luận (SỬA LẠI ĐỂ BẮT LỖI KỸ HƠN)
-  Future<dynamic> addComment(String postId, String content) async {
+  // ================= ADD COMMENT / REPLY =================
+  Future<Map<String, dynamic>?> addComment(
+      String postId,
+      String content, {
+        String? parentId,
+      }) async {
     try {
-      // Gọi API. Nếu thành công, nó trả về object comment vừa tạo
-      final data = await api.post('/posts/$postId/comments', {
+      if (content.trim().isEmpty) {
+        throw Exception("Comment content is empty");
+      }
+
+      final body = {
         'content': content,
-      });
-      return data;
+      };
+
+      // 👇 nếu là reply thì gửi parentId
+      if (parentId != null && parentId.isNotEmpty) {
+        body['parentId'] = parentId;
+      }
+
+      final data = await api.post(
+        '/posts/$postId/comments',
+        body,
+      );
+
+      print("✅ COMMENT CREATED = $data");
+      return Map<String, dynamic>.from(data);
     } catch (e) {
-      // 👇 IN LỖI RA ĐỂ BIẾT TẠI SAO MẤT COMMENT
       print("❌ LỖI GỌI API COMMENT: $e");
       return null;
     }
   }
+
 
   // 3. Lấy chi tiết bài viết (Để load lại comment khi vào màn hình chi tiết)
   Future<Map<String, dynamic>?> getPostDetails(String postId) async {
